@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>실시간 그림판</title>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+    <style>
+        #canvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <h1>실시간 그림판</h1>
+    <div>
+        <label for="room-input">방 ID: </label>
+        <input type="text" id="room-input">
+        <button id="join-room-btn">참가하기</button>
+    </div>
+    <div id="drawing-room" style="display: none;">
+        <h2 id="room-id"></h2>
+        <canvas id="canvas" width="800" height="600"></canvas>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyABxEM-1C0UHCVIRFnxNn45Z1PHTojgl1k",
+            authDomain: "yuchan0.firebaseapp.com",
+            databaseURL: "https://yuchan0-default-rtdb.firebaseio.com",
+            projectId: "yuchan0",
+            storageBucket: "yuchan0.appspot.com",
+            messagingSenderId: "662355873929",
+            appId: "1:662355873929:web:7ed980c15edef4ca4bf658",
+            measurementId: "G-0KG21EV1HH"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        const joinRoomBtn = document.getElementById('join-room-btn');
+        const roomInput = document.getElementById('room-input');
+        const drawingRoomDiv = document.getElementById('drawing-room');
+        const roomIdHeader = document.getElementById('room-id');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let currentRoomId = '';
+        let isDrawing = false;
+        let x0, y0;
+
+
+        function joinRoom(roomId) {
+            if (roomId) {
+                currentRoomId = roomId;
+                roomIdHeader.textContent = `Room ID: ${roomId}`;
+                drawingRoomDiv.style.display = 'block';
+
+                firebase.database().ref('rooms/' + roomId + '/drawing').on('child_added', (snapshot) => {
+                    const data = snapshot.val();
+                    drawOnCanvas(data.x0, data.y0, data.x1, data.y1, data.color);
+                });
+            }
+        }
+
+        function drawOnCanvas(x0, y0, x1, y1, color) {
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(x1, y1);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.closePath();
+        }
+
+        function sendDrawingData(x0, y0, x1, y1, color) {
+            firebase.database().ref('rooms/' + currentRoomId + '/drawing').push({
+                x0: x0,
+                y0: y0,
+                x1: x1,
+                y1: y1,
+                color: color
+            });
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            x0 = e.clientX - rect.left;
+            y0 = e.clientY - rect.top;
+            canvas.addEventListener('mousemove', onMouseMove);
+        });
+
+        function onMouseMove(e) {
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            const x1 = e.clientX - rect.left;
+            const y1 = e.clientY - rect.top;
+            drawOnCanvas(x0, y0, x1, y1, 'black');
+            sendDrawingData(x0, y0, x1, y1, 'black');
+            x0 = x1;
+            y0 = y1;
+        }
+
+        canvas.addEventListener('mouseup', () => {
+            isDrawing = false;
+            canvas.removeEventListener('mousemove', onMouseMove);
+        });
+
+        joinRoomBtn.addEventListener('click', () => {
+            const roomId = roomInput.value;
+            if (roomId) {
+                window.location.hash = roomId;
+                joinRoom(roomId);
+            }
+        });
+
+        window.addEventListener('load', () => {
+            const hash = window.location.hash.substring(1);
+            if (hash) {
+                joinRoom(hash);
+            }
+        });
+    </script>
+</body>
+</html>
